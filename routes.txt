@@ -1,0 +1,6 @@
+# example routing table used in the README
+GET /users/{id}
+GET /users/me
+GET /files/{path...}
+POST /users/
+/health

@@ -1,0 +1,4 @@
+/routecheck
+*.exe
+*.test
+.DS_Store
