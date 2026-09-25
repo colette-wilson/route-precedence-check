@@ -25,6 +25,7 @@ type Pattern struct {
 	Method   string // empty means "matches any method"
 	segments []segment
 	subtree  bool // pattern ends in "/", so it also matches anything below it
+	exactEnd bool // pattern ends in "{$}", so it matches the directory path and nothing below it
 }
 
 func parsePattern(raw string, line int) (*Pattern, error) {
@@ -51,10 +52,19 @@ func parsePattern(raw string, line int) (*Pattern, error) {
 	trimmed := strings.Trim(rest, "/")
 
 	var segs []segment
+	var exactEnd bool
 	if trimmed != "" {
 		parts := strings.Split(trimmed, "/")
 		for i, part := range parts {
 			switch {
+			case part == "{$}":
+				if i != len(parts)-1 {
+					return nil, fmt.Errorf("line %d: %q must be the last segment", line, part)
+				}
+				exactEnd = true
+				subtree = false // {$} pins the match to exactly this path, not anything below it
+			case strings.Contains(part, "{$}"):
+				return nil, fmt.Errorf("line %d: %q must be its own segment", line, part)
 			case strings.HasPrefix(part, "{") && strings.HasSuffix(part, "...}"):
 				if i != len(parts)-1 {
 					return nil, fmt.Errorf("line %d: wildcard %q must be the last segment", line, part)
@@ -69,7 +79,7 @@ func parsePattern(raw string, line int) (*Pattern, error) {
 		}
 	}
 
-	return &Pattern{Raw: raw, Line: line, Method: method, segments: segs, subtree: subtree}, nil
+	return &Pattern{Raw: raw, Line: line, Method: method, segments: segs, subtree: subtree, exactEnd: exactEnd}, nil
 }
 
 func isMethod(s string) bool {

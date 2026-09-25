@@ -30,6 +30,10 @@ POST /users/
   including slashes.
 - A pattern ending in `/` also matches anything below it (a subtree match),
   the same convention `net/http`'s `ServeMux` uses.
+- `{$}` as the last segment matches the path exactly and turns off the
+  subtree behavior. `GET /images/` matches `/images/` and everything under
+  it; `GET /images/{$}` matches only `/images/` itself. Use it when a
+  subtree pattern and an exact one need to coexist in the same table.
 
 ## Usage
 
@@ -69,5 +73,5 @@ framework's own tie-breaking rules exactly.
 
 ## Status
 
-Early. Host matching, `{$}` end-of-path markers, and a stricter
-reimplementation of `ServeMux`'s actual precedence algorithm are not in yet.
+Early. Host matching and a stricter reimplementation of `ServeMux`'s actual
+precedence algorithm are not in yet.
