@@ -35,11 +35,15 @@ POST /users/
   it; `GET /images/{$}` matches only `/images/` itself. Use it when a
   subtree pattern and an exact one need to coexist in the same table.
 
+- An optional host goes right before the path: `GET example.com/docs/`.
+  Host patterns only match requests made with `-host example.com` (case
+  and port are ignored), and they beat any pattern without a host.
+
 ## Usage
 
 ```
 $ go build -o routecheck .
-$ ./routecheck routes.txt GET /users/me
+$ ./routecheck [-host name] routes.txt GET /users/me
 
 match: GET /users/me (line 2)
 
@@ -73,5 +77,5 @@ framework's own tie-breaking rules exactly.
 
 ## Status
 
-Early. Host matching and a stricter reimplementation of `ServeMux`'s actual
-precedence algorithm are not in yet.
+Early. A stricter reimplementation of `ServeMux`'s actual precedence
+algorithm is not in yet.

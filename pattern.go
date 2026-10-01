@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -23,6 +24,7 @@ type Pattern struct {
 	Raw      string
 	Line     int
 	Method   string // empty means "matches any method"
+	Host     string // lowercased; empty means "matches any host"
 	segments []segment
 	subtree  bool // pattern ends in "/", so it also matches anything below it
 	exactEnd bool // pattern ends in "{$}", so it matches the directory path and nothing below it
@@ -44,8 +46,20 @@ func parsePattern(raw string, line int) (*Pattern, error) {
 		}
 	}
 
+	// Anything before the first slash is a host, as in ServeMux patterns
+	// like "example.com/docs/".
+	host := ""
 	if !strings.HasPrefix(rest, "/") {
-		return nil, fmt.Errorf("line %d: path must start with /: %q", line, raw)
+		slash := strings.IndexByte(rest, '/')
+		if slash == -1 {
+			return nil, fmt.Errorf("line %d: path must start with /: %q", line, raw)
+		}
+		host = rest[:slash]
+		if strings.ContainsAny(host, "{} \t") {
+			return nil, fmt.Errorf("line %d: invalid host %q", line, host)
+		}
+		host = strings.ToLower(host)
+		rest = rest[slash:]
 	}
 
 	subtree := rest == "/" || strings.HasSuffix(rest, "/")
@@ -79,7 +93,17 @@ func parsePattern(raw string, line int) (*Pattern, error) {
 		}
 	}
 
-	return &Pattern{Raw: raw, Line: line, Method: method, segments: segs, subtree: subtree, exactEnd: exactEnd}, nil
+	return &Pattern{Raw: raw, Line: line, Method: method, Host: host, segments: segs, subtree: subtree, exactEnd: exactEnd}, nil
+}
+
+// normalizeHost lowercases a request host and drops any port, since patterns
+// name hosts without one.
+func normalizeHost(host string) string {
+	host = strings.ToLower(host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
 }
 
 func isMethod(s string) bool {
@@ -90,10 +114,14 @@ func isMethod(s string) bool {
 	return false
 }
 
-// Match reports whether the pattern matches the given method and path, and
-// if so, the path parameters it captured.
-func (p *Pattern) Match(method, path string) (bool, map[string]string) {
+// Match reports whether the pattern matches the given method, host and path,
+// and if so, the path parameters it captured. An empty host only matches
+// patterns that don't name one.
+func (p *Pattern) Match(method, host, path string) (bool, map[string]string) {
 	if p.Method != "" && p.Method != method {
+		return false, nil
+	}
+	if p.Host != "" && p.Host != normalizeHost(host) {
 		return false, nil
 	}
 
@@ -141,6 +169,11 @@ func (p *Pattern) Match(method, path string) (bool, map[string]string) {
 // to reproduce every edge case of that algorithm.
 func (p *Pattern) specificity() int {
 	score := 0
+	// A host-specific pattern always beats a hostless one, as in ServeMux,
+	// so this outweighs anything the path can contribute.
+	if p.Host != "" {
+		score += 100000
+	}
 	if p.Method != "" {
 		score += 1000
 	}

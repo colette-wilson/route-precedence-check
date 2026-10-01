@@ -2,18 +2,24 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
 )
 
 func main() {
-	if len(os.Args) != 4 {
-		fmt.Fprintf(os.Stderr, "usage: %s routes.txt METHOD /path\n", os.Args[0])
+	host := flag.String("host", "", "request host, matched against patterns that name one")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s [-host name] routes.txt METHOD /path\n", os.Args[0])
+	}
+	flag.Parse()
+	if flag.NArg() != 3 {
+		flag.Usage()
 		os.Exit(2)
 	}
 
-	routesPath, method, path := os.Args[1], os.Args[2], os.Args[3]
+	routesPath, method, path := flag.Arg(0), flag.Arg(1), flag.Arg(2)
 
 	patterns, err := loadRoutes(routesPath)
 	if err != nil {
@@ -28,7 +34,7 @@ func main() {
 
 	var matches []candidate
 	for _, p := range patterns {
-		if ok, params := p.Match(method, path); ok {
+		if ok, params := p.Match(method, *host, path); ok {
 			matches = append(matches, candidate{p, params})
 		}
 	}
